@@ -1,0 +1,24 @@
+name: Northbrook tests and build
+
+on:
+  push:
+    branches: [northbrook, feat/quota-aware-routing]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-build:
+    if: github.repository == 'north-brook/CLIProxyAPI'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Test
+        run: go test ./...
+      - name: Build
+        run: go build -o test-output ./cmd/server && rm test-output
