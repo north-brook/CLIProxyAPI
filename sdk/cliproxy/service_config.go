@@ -2,9 +2,11 @@ package cliproxy
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"time"
 
+	internalconfig "github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -56,6 +58,7 @@ type configCommit struct {
 
 type routingRuntimeState struct {
 	strategy                 string
+	quotaAwareJSON           string
 	sessionAffinity          bool
 	sessionAffinityTTL       time.Duration
 	sessionAffinitySubagents bool
@@ -76,6 +79,10 @@ func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
 	switch strings.ToLower(strings.TrimSpace(cfg.Routing.Strategy)) {
 	case "weighted-round-robin", "weightedroundrobin", "wrr":
 		state.strategy = "weighted-round-robin"
+	case "quota-aware":
+		state.strategy = "quota-aware"
+		policy, _ := json.Marshal(cfg.Routing.QuotaAware)
+		state.quotaAwareJSON = string(policy)
 	case "fill-first", "fillfirst", "ff":
 		state.strategy = "fill-first"
 	}
@@ -100,6 +107,10 @@ func normalizedRoutingRuntimeState(cfg *config.Config) routingRuntimeState {
 func newRoutingSelector(state routingRuntimeState) coreauth.Selector {
 	var selector coreauth.Selector
 	switch state.strategy {
+	case "quota-aware":
+		var policy internalconfig.QuotaAwareRoutingConfig
+		_ = json.Unmarshal([]byte(state.quotaAwareJSON), &policy)
+		selector = coreauth.NewQuotaAwareSelector(policy)
 	case "weighted-round-robin":
 		selector = &coreauth.WeightedRoundRobinSelector{}
 	case "fill-first":
@@ -144,6 +155,10 @@ func (s *Service) commitConfigUpdate(newCfg *config.Config) configCommit {
 		s.cfgMu.RUnlock()
 	}
 	if newCfg == nil {
+		return configCommit{}
+	}
+	if errValidate := newCfg.ValidateQuotaRouting(); errValidate != nil {
+		log.WithError(errValidate).Warn("rejected invalid quota routing configuration")
 		return configCommit{}
 	}
 	if errValidate := newCfg.ValidateCredentialWeights(); errValidate != nil {

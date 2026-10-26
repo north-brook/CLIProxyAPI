@@ -628,6 +628,14 @@ func (m *Manager) availableAuthsForRouteModelWithPriorityMode(auths []*Auth, pro
 // unless session affinity or an across-priorities scheduler is active, in which case the selector
 // or scheduler additionally receives lower priority tiers.
 func (m *Manager) availableAuthsForSelector(selector Selector, auths []*Auth, provider, routeModel string, now time.Time, schedulerAcross bool) (priorityAuths, selectorAuths []*Auth, err error) {
+	if quota := quotaSelector(selector); quota != nil {
+		all, errAvailable := m.availableAuthsForRouteModelAcrossPriorities(auths, provider, routeModel, now)
+		if errAvailable != nil {
+			return nil, nil, errAvailable
+		}
+		eligible, errQuota := quota.eligible(cloneAuthSlice(all), routeModel, now)
+		return eligible, eligible, errQuota
+	}
 	_, sessionAffinity := selector.(*SessionAffinitySelector)
 
 	if !sessionAffinity && !schedulerAcross {
@@ -692,6 +700,9 @@ func (m *Manager) transientlyUnavailableSessionAffinityAuthIDs(selector Selector
 	var authIDs map[string]struct{}
 	for _, candidate := range affinityCandidates {
 		if candidate == nil || candidate.ID == "" {
+			continue
+		}
+		if quota := quotaSelector(selector); quota != nil && quota.budget(candidate, routeModel, now).blocked {
 			continue
 		}
 		checkModel := m.selectionModelForAuth(candidate, routeModel)
@@ -1021,6 +1032,11 @@ func (m *Manager) pickViaPluginScheduler(ctx context.Context, scheduler PluginSc
 
 	strategy, okStrategy := builtinSchedulerStrategy(resp.DelegateBuiltin)
 	if !okStrategy {
+		return nil, false, nil
+	}
+	// A built-in delegate selects from the scheduler's full pool. Keep quota
+	// routing on the filtered selector path so a delegate cannot spend reserves.
+	if quotaSelector(m.Selector()) != nil {
 		return nil, false, nil
 	}
 	return m.pickViaBuiltinScheduler(ctx, strategy, providerKey, providers, model, opts, tried)

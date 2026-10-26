@@ -121,6 +121,8 @@ func (s *Service) Run(ctx context.Context) error {
 		}
 	}
 
+	go s.runQuotaRefresh(ctx)
+
 	// legacy clients removed; no caches to refresh
 
 	s.ensureWebsocketGateway()
