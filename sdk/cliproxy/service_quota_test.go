@@ -11,7 +11,7 @@ import (
 
 func TestClaudeUsageHeaders(t *testing.T) {
 	now := time.Unix(1800000000, 0)
-	body := `{"five_hour":{"utilization":0,"resets_at":null},"seven_day":{"utilization":61,"resets_at":"2027-02-01T00:00:00Z"},"seven_day_opus":{"utilization":81,"resets_at":"2027-02-01T00:00:00Z"},"seven_day_sonnet":null}`
+	body := `{"five_hour":{"utilization":0,"resets_at":null},"seven_day":{"utilization":61,"resets_at":"2027-02-01T00:00:00Z"},"seven_day_opus":{"utilization":81,"resets_at":"2027-02-01T00:00:00Z"},"seven_day_sonnet":null,"other_limits":[],"extra_usage":{"is_enabled":false}}`
 	h, err := claudeUsageHeaders(strings.NewReader(body), now)
 	if err != nil {
 		t.Fatal(err)

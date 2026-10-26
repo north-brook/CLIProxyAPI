@@ -23,13 +23,18 @@ type claudeUsageWindow struct {
 // claudeUsageHeaders converts the usage endpoint's percentages to the same
 // fractional header format already observed on normal Claude responses.
 func claudeUsageHeaders(body io.Reader, observedAt time.Time) (http.Header, error) {
-	var usage map[string]*claudeUsageWindow
+	var usage map[string]json.RawMessage
 	if errDecode := json.NewDecoder(io.LimitReader(body, 64<<10)).Decode(&usage); errDecode != nil {
 		return nil, fmt.Errorf("decode Claude usage: %w", errDecode)
 	}
 	headers := http.Header{}
 	for name, window := range map[string]string{"five_hour": "5h", "seven_day": "7d", "seven_day_opus": "7d-opus", "seven_day_sonnet": "7d-sonnet"} {
-		w := usage[name]
+		var w *claudeUsageWindow
+		if raw := usage[name]; len(raw) > 0 {
+			if errWindow := json.Unmarshal(raw, &w); errWindow != nil {
+				return nil, fmt.Errorf("decode Claude quota window %s: %w", name, errWindow)
+			}
+		}
 		if w == nil || w.Utilization == nil {
 			continue
 		}
