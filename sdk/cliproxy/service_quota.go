@@ -20,6 +20,17 @@ type claudeUsageWindow struct {
 	ResetsAt    *time.Time `json:"resets_at"`
 }
 
+func quotaRetryBackoff(value string, now time.Time) time.Duration {
+	backoff := 15 * time.Minute
+	if seconds, errParse := strconv.Atoi(value); errParse == nil && seconds > 0 {
+		return max(backoff, time.Duration(seconds)*time.Second)
+	}
+	if until, errParse := http.ParseTime(value); errParse == nil {
+		return max(backoff, until.Sub(now))
+	}
+	return backoff
+}
+
 // claudeUsageHeaders converts the usage endpoint's percentages to the same
 // fractional header format already observed on normal Claude responses.
 func claudeUsageHeaders(body io.Reader, observedAt time.Time) (http.Header, error) {
@@ -85,10 +96,7 @@ func (s *Service) refreshClaudeQuota(ctx context.Context, auth *coreauth.Auth) (
 	if resp.StatusCode != http.StatusOK {
 		backoff := time.Duration(0)
 		if resp.StatusCode == http.StatusTooManyRequests {
-			backoff = 15 * time.Minute
-			if seconds, errParse := strconv.Atoi(resp.Header.Get("Retry-After")); errParse == nil && seconds > 0 {
-				backoff = max(backoff, time.Duration(seconds)*time.Second)
-			}
+			backoff = quotaRetryBackoff(resp.Header.Get("Retry-After"), time.Now())
 		}
 		return backoff, fmt.Errorf("Claude quota request returned HTTP %d", resp.StatusCode)
 	}

@@ -123,7 +123,6 @@ func (q *QuotaAwareSelector) Pick(ctx context.Context, provider, model string, o
 	if err != nil {
 		return nil, err
 	}
-	available = preferCodexWebsocketAuths(ctx, provider, available)
 	bestScore := -1.0
 	var best []*Auth
 	for _, auth := range available {

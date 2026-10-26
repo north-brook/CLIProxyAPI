@@ -1,6 +1,7 @@
 package cliproxy
 
 import (
+	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -44,5 +45,23 @@ func TestQuotaAwareRoutingConfigReload(t *testing.T) {
 	invalid.Routing.QuotaAware.Reserves[0].Percent = 101
 	if service.commitConfigUpdate(invalid).cfg != nil || service.currentConfig() != cfg {
 		t.Fatal("invalid reserve replaced current configuration")
+	}
+}
+
+func TestQuotaRetryBackoff(t *testing.T) {
+	now := time.Date(2026, 10, 26, 4, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		value string
+		want  time.Duration
+	}{
+		{"3600", time.Hour},
+		{now.Add(90 * time.Minute).Format(http.TimeFormat), 90 * time.Minute},
+		{"5", 15 * time.Minute},
+		{now.Add(-time.Hour).Format(http.TimeFormat), 15 * time.Minute},
+		{"invalid", 15 * time.Minute},
+	} {
+		if got := quotaRetryBackoff(tc.value, now); got != tc.want {
+			t.Fatalf("Retry-After %q = %v, want %v", tc.value, got, tc.want)
+		}
 	}
 }

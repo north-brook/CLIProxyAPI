@@ -197,3 +197,16 @@ func TestQuotaAwarePluginDelegateCannotBypassReserves(t *testing.T) {
 		t.Fatal("reserved account was eligible")
 	}
 }
+
+func TestQuotaAwarePreservesCodexPriorityBeforeWebsocketPreference(t *testing.T) {
+	q := quotaTestSelector()
+	auths := []*Auth{
+		{ID: "low-ws", Provider: "codex", Attributes: map[string]string{"priority": "0", "websockets": "true"}},
+		{ID: "high-http", Provider: "codex", Attributes: map[string]string{"priority": "10", "websockets": "false"}},
+	}
+	ctx := cliproxyexecutor.WithDownstreamWebsocket(context.Background())
+	selected, err := q.Pick(ctx, "codex", "model", cliproxyexecutor.Options{}, auths)
+	if err != nil || selected.ID != "high-http" {
+		t.Fatalf("WebSocket preference bypassed priority: %v %v", selected, err)
+	}
+}

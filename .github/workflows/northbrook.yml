@@ -2,7 +2,9 @@ name: Northbrook tests and build
 
 on:
   push:
-    branches: [northbrook, feat/quota-aware-routing]
+    branches: [northbrook]
+  pull_request:
+    branches: [northbrook]
   workflow_dispatch:
 
 permissions:
