@@ -1,7 +1,7 @@
 # Northbrook quota-aware routing
 
 This fork adds a standalone Claude OAuth routing strategy on top of upstream
-CLIProxyAPI v8.0.43. Codex WebSockets and the other existing transports are preserved.
+CLIProxyAPI v8.0.64. Codex WebSockets and the other existing transports are preserved.
 
 ```yaml
 routing:
@@ -85,3 +85,25 @@ go build -o cli-proxy-api ./cmd/server
 
 On macOS, point DEVELOPER_DIR and SDKROOT at a matching installed Xcode toolchain
 if the default compiler cannot read the selected SDK's text-based libraries.
+
+## Claude Code updates
+
+Native Claude Code and Agent SDK requests retain their actual client version.
+Recognition validates the request's native signals and metadata contract instead
+of requiring the proxy's fallback major/minor release line. Compatible patch,
+minor, and major updates therefore do not require editing a version override.
+The supported metadata contract begins at 2.1.220; an explicitly configured older
+baseline remains supported. A newer fallback does not reject older compatible
+native clients. Device-profile stabilization cannot downgrade a newer caller's
+User-Agent to a cached version.
+
+Remove old `claude-header-defaults.user-agent` overrides from local configurations.
+That setting is still a fallback for non-native clients; it is not a Claude Code
+installation pin. Native requests must still supply the expected app, beta,
+entrypoint, and metadata signals. Unknown future protocol changes can require a
+proxy update even though version increments alone no longer do.
+
+Regression coverage exercises normal Messages, streaming, and token counting
+with future patch/minor/major versions, SDK entrypoints, request extensions, and
+both default and stabilized device profiles. Upstream v8.0.64 also supplies the
+newer User-Agent extension parser and current model definitions.
